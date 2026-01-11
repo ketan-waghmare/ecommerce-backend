@@ -3,13 +3,16 @@ package com.ecommerce.ecommerce_backend.services;
 import com.ecommerce.ecommerce_backend.entity.Cart;
 import com.ecommerce.ecommerce_backend.entity.CartItem;
 import com.ecommerce.ecommerce_backend.entity.Product;
+import com.ecommerce.ecommerce_backend.entity.User;
 import com.ecommerce.ecommerce_backend.repository.CartItemRepository;
 import com.ecommerce.ecommerce_backend.repository.CartRepository;
 import com.ecommerce.ecommerce_backend.repository.ProductRepository;
+import com.ecommerce.ecommerce_backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -23,6 +26,9 @@ public class CartService {
 
     @Autowired
     private ProductRepository productRepository;
+
+    @Autowired
+    private UserRepository userRepository;
 
 //    public Cart createCart() {
 //        Cart cart = new Cart();
@@ -71,6 +77,10 @@ public class CartService {
                 .orElseThrow(() -> new RuntimeException("Cart not found"));
     }
 
+    public Cart getCartByUserId(Long userId) {
+        return cartRepository.findByUserId(userId).orElseThrow(() -> new RuntimeException("Cart not found using userId"));
+    }
+
     @Transactional
     public Cart removeCartItem(Long cartItemId) {
         CartItem cartItem = cartItemRepository.findById(cartItemId)
@@ -98,6 +108,55 @@ public class CartService {
         }
 
         return item.getCart();
+    }
+
+
+    //merge cart
+    @Transactional
+    public Cart mergeCart(String guestCartId, Long userId) {
+
+        Cart guestCart = cartRepository.findByCartId(guestCartId)
+                .orElseThrow(() -> new RuntimeException("Guest cart not found"));
+
+        User user = userRepository.findById(userId).orElseThrow(() ->  new RuntimeException("User not found"));
+
+//        Cart userCart = createNewUserCart(user);
+
+        Cart userCart = cartRepository.findByUserId(userId)
+                .orElseGet(() -> createNewUserCart(user));
+
+        for (CartItem guestItem : guestCart.getItems()) {
+
+            Optional<CartItem> existingItem = userCart.getItems().stream()
+                    .filter(i -> i.getProduct().getId()
+                            .equals(guestItem.getProduct().getId()))
+                    .findFirst();
+
+            if (existingItem.isPresent()) {
+                existingItem.get().setQuantity(
+                        existingItem.get().getQuantity() + guestItem.getQuantity()
+                );
+            } else {
+                CartItem newItem = new CartItem();
+                newItem.setProduct(guestItem.getProduct());
+                newItem.setQuantity(guestItem.getQuantity());
+                newItem.setPrice(guestItem.getPrice());
+                newItem.setCart(userCart);
+
+                userCart.getItems().add(newItem);
+            }
+        }
+
+        cartRepository.save(userCart);
+        cartRepository.delete(guestCart);
+
+        return userCart;
+    }
+
+    private Cart createNewUserCart(User user) {
+        Cart cart = new Cart();
+        cart.setUser(user);
+        return cartRepository.save(cart);
     }
 
 

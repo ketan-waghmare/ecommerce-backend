@@ -36,7 +36,7 @@ public class UserController {
                 request.get("password")
         );
 
-         String token = jwtUtil.generateToken(user.getEmail());
+         String token = jwtUtil.generateToken(user);
 
          Map<String,String> response = new HashMap<>();
          response.put("token",token);
