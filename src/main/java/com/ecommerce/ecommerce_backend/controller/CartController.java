@@ -1,14 +1,18 @@
 package com.ecommerce.ecommerce_backend.controller;
 
 import com.ecommerce.ecommerce_backend.entity.Cart;
+import com.ecommerce.ecommerce_backend.entity.User;
+import com.ecommerce.ecommerce_backend.repository.UserRepository;
 import com.ecommerce.ecommerce_backend.security.UserPrincipal;
 import com.ecommerce.ecommerce_backend.services.CartService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/cart")
 public class CartController {
@@ -17,18 +21,46 @@ public class CartController {
     @Autowired
     private CartService cartService;
 
-//    @PostMapping("/create")
-//    public Cart createCart() {
-//        return cartService.createCart();
-//    }
+    @Autowired
+    private UserRepository userRepository;
 
     @PostMapping("/add")
-    public Cart addToCart(
-            @RequestParam String cartId,
+    public ResponseEntity<Cart> addToCart(
+            @RequestParam(required = false) String cartId,
             @RequestParam Long productId,
-            @RequestParam int quantity
+            @RequestParam(defaultValue = "1") int quantity,
+            Authentication authentication
     ) {
-        return cartService.addToCart(cartId,productId,quantity);
+
+        User user = getUserFromAuthentication(authentication);
+
+        log.info("Add to cart request - ProductId: {}, Quantity: {}, CartId: {}, Authenticated: {}",
+                productId, quantity, cartId, authentication != null);
+
+        Cart cart = cartService.addToCart(cartId,productId,quantity,user);
+        return ResponseEntity.ok(cart);
+    }
+
+    private User getUserFromAuthentication(Authentication authentication) {
+        if (authentication == null || authentication.getPrincipal() == null) {
+            return null;
+        }
+
+        Object principal = authentication.getPrincipal();
+
+        // If it's already a User entity, return it
+        if (principal instanceof User) {
+            return (User) principal;
+        }
+
+        // If it's a UserPrincipal, get the user from database
+        if (principal instanceof UserPrincipal) {
+            UserPrincipal userPrincipal = (UserPrincipal) principal;
+            Long userId = userPrincipal.getUserId();
+            return userRepository.findById(userId).orElse(null);
+        }
+
+        return null;
     }
 
     @GetMapping

@@ -48,6 +48,7 @@ public class SecurityConfig {
                         // PUBLIC
                         .requestMatchers("/api/users/login", "/api/users/register").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/cart/add").permitAll()
+                        .requestMatchers( "/api/cart/**").permitAll()
                         .requestMatchers(HttpMethod.DELETE, "/api/cart/**").permitAll()
                         .requestMatchers(HttpMethod.PUT, "/api/cart/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/cart").permitAll()
