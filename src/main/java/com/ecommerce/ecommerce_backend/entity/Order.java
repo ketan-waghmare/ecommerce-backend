@@ -19,6 +19,8 @@ public class Order {
 
         private Double totalAmount;
 
+        private LocalDateTime orderDate;
+
         private String status; // CREATED, PAID, SHIPPED
 
         private LocalDateTime createdAt;
@@ -31,6 +33,17 @@ public class Order {
         public void prePersist() {
                 this.createdAt = LocalDateTime.now();
         }
+
+        // NEW FIELDS
+        private String orderNumber;
+        private String shippingAddress;
+        private String shippingCity;
+        private String shippingState;
+        private String shippingZip;
+        private String shippingPhone;
+        private String paymentMethod; // COD, CARD, UPI
+        private String paymentStatus; // UNPAID, PAID
+        private LocalDateTime updatedAt;
 
 }
 

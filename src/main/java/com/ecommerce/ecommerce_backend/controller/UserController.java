@@ -40,6 +40,9 @@ public class UserController {
 
          Map<String,String> response = new HashMap<>();
          response.put("token",token);
+         response.put("role", user.getRole());
+         response.put("name",user.getName());
+         response.put("userId", String.valueOf(user.getId()));
 
          return response;
     }
