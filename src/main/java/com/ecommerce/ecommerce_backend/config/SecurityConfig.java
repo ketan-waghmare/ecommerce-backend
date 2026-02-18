@@ -49,7 +49,11 @@ public class SecurityConfig {
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
 
+
+
                 .authorizeHttpRequests(auth -> auth
+
+                        .requestMatchers("/uploads/**").permitAll()
                         // PUBLIC
                         .requestMatchers("/api/users/login", "/api/users/register").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/cart/add").permitAll()
