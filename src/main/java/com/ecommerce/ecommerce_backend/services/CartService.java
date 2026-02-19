@@ -3,15 +3,19 @@ package com.ecommerce.ecommerce_backend.services;
 import com.ecommerce.ecommerce_backend.entity.Cart;
 import com.ecommerce.ecommerce_backend.entity.CartItem;
 import com.ecommerce.ecommerce_backend.entity.Product;
+import com.ecommerce.ecommerce_backend.entity.User;
 import com.ecommerce.ecommerce_backend.repository.CartItemRepository;
 import com.ecommerce.ecommerce_backend.repository.CartRepository;
 import com.ecommerce.ecommerce_backend.repository.ProductRepository;
+import com.ecommerce.ecommerce_backend.repository.UserRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
 import java.util.UUID;
-
+@Slf4j
 @Service
 public class CartService {
 
@@ -24,21 +28,45 @@ public class CartService {
     @Autowired
     private ProductRepository productRepository;
 
-//    public Cart createCart() {
-//        Cart cart = new Cart();
-//        cart.setCartId(UUID.randomUUID().toString());
-//        return cartRepository.save(cart);
-//    }
+    @Autowired
+    private UserRepository userRepository;
 
-    public Cart addToCart(String cartId, Long productId, int quantity) {
+    public Cart addToCart(String cartId, Long productId, int quantity,User user) {
 
-        Cart cart = cartRepository.findByCartId(cartId)
-                .orElseGet(() -> {
-                   Cart c = new Cart();
-                   c.setCartId(cartId);
-                   c.setTotalAmount(0.0);
-                   return cartRepository.save(c);
-                });
+//        Cart cart = cartRepository.findByCartId(cartId)
+//                .orElseGet(() -> {
+//                   Cart c = new Cart();
+//                   c.setCartId(cartId);
+//                   c.setTotalAmount(0.0);
+//                   return cartRepository.save(c);
+//                });
+
+        log.info("Adding to cart - ProductId: {}, User: {}, CartId: {}",
+                productId, user != null ? user.getId() : "anonymous", cartId);
+
+        // KEY CHANGE: If user is logged in, ALWAYS use their cart
+        Cart cart;
+        if (user != null) {
+            // Authenticated user - ignore cartId parameter
+            cart = cartRepository.findByUserId(user.getId())
+                    .orElseGet(() -> {
+                        Cart c = new Cart();
+                        c.setUser(user);
+                        c.setTotalAmount(0.0);
+                        return cartRepository.save(c);
+                    });
+            log.debug("Using authenticated user cart: {}", cart.getId());
+        } else {
+            // Anonymous user - use cartId
+            cart = cartRepository.findByCartId(cartId)
+                    .orElseGet(() -> {
+                        Cart c = new Cart();
+                        c.setCartId(cartId);
+                        c.setTotalAmount(0.0);
+                        return cartRepository.save(c);
+                    });
+            log.debug("Using anonymous cart: {}", cart.getId());
+        }
 
         Product product =productRepository.findById(productId)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
@@ -71,6 +99,10 @@ public class CartService {
                 .orElseThrow(() -> new RuntimeException("Cart not found"));
     }
 
+    public Cart getCartByUserId(Long userId) {
+        return cartRepository.findByUserId(userId).orElseThrow(() -> new RuntimeException("Cart not found using userId"));
+    }
+
     @Transactional
     public Cart removeCartItem(Long cartItemId) {
         CartItem cartItem = cartItemRepository.findById(cartItemId)
@@ -98,6 +130,55 @@ public class CartService {
         }
 
         return item.getCart();
+    }
+
+
+    //merge cart
+    @Transactional
+    public Cart mergeCart(String guestCartId, Long userId) {
+
+        Cart guestCart = cartRepository.findByCartId(guestCartId)
+                .orElseThrow(() -> new RuntimeException("Guest cart not found"));
+
+        User user = userRepository.findById(userId).orElseThrow(() ->  new RuntimeException("User not found"));
+
+//        Cart userCart = createNewUserCart(user);
+
+        Cart userCart = cartRepository.findByUserId(userId)
+                .orElseGet(() -> createNewUserCart(user));
+
+        for (CartItem guestItem : guestCart.getItems()) {
+
+            Optional<CartItem> existingItem = userCart.getItems().stream()
+                    .filter(i -> i.getProduct().getId()
+                            .equals(guestItem.getProduct().getId()))
+                    .findFirst();
+
+            if (existingItem.isPresent()) {
+                existingItem.get().setQuantity(
+                        existingItem.get().getQuantity() + guestItem.getQuantity()
+                );
+            } else {
+                CartItem newItem = new CartItem();
+                newItem.setProduct(guestItem.getProduct());
+                newItem.setQuantity(guestItem.getQuantity());
+                newItem.setPrice(guestItem.getPrice());
+                newItem.setCart(userCart);
+
+                userCart.getItems().add(newItem);
+            }
+        }
+
+        cartRepository.save(userCart);
+        cartRepository.delete(guestCart);
+
+        return userCart;
+    }
+
+    private Cart createNewUserCart(User user) {
+        Cart cart = new Cart();
+        cart.setUser(user);
+        return cartRepository.save(cart);
     }
 
 

@@ -36,10 +36,13 @@ public class UserController {
                 request.get("password")
         );
 
-         String token = jwtUtil.generateToken(user.getEmail());
+         String token = jwtUtil.generateToken(user);
 
          Map<String,String> response = new HashMap<>();
          response.put("token",token);
+         response.put("role", user.getRole());
+         response.put("name",user.getName());
+         response.put("userId", String.valueOf(user.getId()));
 
          return response;
     }

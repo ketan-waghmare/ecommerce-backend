@@ -20,4 +20,11 @@ public class OrderItem {
     private Integer quantity;
 
     private Double price;
+
+    // NEW SNAPSHOT FIELDS (CRITICAL!)
+    @Column(name = "product_name", nullable = false)
+    private String productName;  // Product name at time of purchase
+
+    @Column(name = "product_image_url", length = 500)
+    private String productImageUrl;  // Product image at time of purchase
 }
